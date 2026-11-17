@@ -9,9 +9,6 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    /**
-     * Iniciar sesión y generar un Token Bearer (JSON)
-     */
     public function login(Request $request)
     {
         $request->validate([
@@ -27,7 +24,6 @@ class AuthController extends Controller
             ]);
         }
 
-        // Revocar tokens anteriores y generar uno nuevo
         $user->tokens()->delete();
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -44,9 +40,6 @@ class AuthController extends Controller
         ], 200);
     }
 
-    /**
-     * Cerrar sesión (revocar el token actual)
-     */
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
@@ -56,9 +49,6 @@ class AuthController extends Controller
         ], 200);
     }
 
-    /**
-     * Obtener los datos del usuario autenticado
-     */
     public function me(Request $request)
     {
         return response()->json([
