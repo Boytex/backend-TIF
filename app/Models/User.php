@@ -2,50 +2,46 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
-use Laravel\Sanctum\HasApiTokens; // 1. Importas el trait de Sanctum
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable; // 2. Lo agregas aquí
+    use HasApiTokens, HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
-    protected $fillable = [
-        'name',
-        'email',
-        'password',
-        'role', // 3. ¡Importante! Agregamos 'role' para que no dé error al crearlo con roles en los tests o seeders
-    ];
+    protected $fillable = ['name', 'email', 'password', 'role'];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
-    protected $hidden = [
-        'password',
-        'remember_token',
-    ];
+    protected $hidden = ['password', 'remember_token'];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function createdIncidents()
+    {
+        return $this->hasMany(Incident::class, 'user_id');
+    }
+
+    public function assignedIncidents()
+    {
+        return $this->hasMany(Incident::class, 'technician_id');
+    }
+
+    public function comments()
+    {
+        return $this->hasMany(Comment::class);
+    }
+
+    public function isTechnician(): bool
+    {
+        return $this->role === 'tecnico';
     }
 }
