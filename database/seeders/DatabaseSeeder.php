@@ -2,45 +2,35 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use App\Models\Category;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // 1. Crear las categorías obligatorias para las incidencias
-        $categories = [
-            'Hardware',
-            'Software',
-            'Red',
-            'Impresoras',
-            'Otros'
-        ];
-
-        foreach ($categories as $categoryName) {
-            Category::create(['name' => $categoryName]);
+        foreach (['Hardware', 'Software', 'Red', 'Impresoras', 'Otros'] as $name) {
+            Category::firstOrCreate(['name' => $name]);
         }
 
-        // 2. Crear usuario con rol "tecnico" para pruebas
-        User::create([
-            'name' => 'Técnico Soporte',
-            'email' => 'tecnico@tif.com',
-            'password' => Hash::make('password123'),
-            'role' => 'tecnico',
-        ]);
+        User::updateOrCreate(
+            ['email' => 'tecnico@tif.com'],
+            [
+                'name' => 'Técnico de Soporte',
+                'password' => Hash::make('password123'),
+                'role' => 'tecnico',
+            ]
+        );
 
-        // 3. Crear usuario con rol "usuario" común para pruebas
-        User::create([
-            'name' => 'Usuario Común',
-            'email' => 'usuario@tif.com',
-            'password' => Hash::make('password123'),
-            'role' => 'usuario',
-        ]);
+        User::updateOrCreate(
+            ['email' => 'usuario@tif.com'],
+            [
+                'name' => 'Usuario de Prueba',
+                'password' => Hash::make('password123'),
+                'role' => 'usuario',
+            ]
+        );
     }
 }
