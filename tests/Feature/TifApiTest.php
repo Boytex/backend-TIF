@@ -2,179 +2,217 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\Category;
+use App\Models\Incident;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class TifApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_un_usuario_sin_autenticar_no_puede_ver_las_incidencias()
-    {
-        $response = $this->getJson('/api/incidents');
+    private Category $category;
 
-        // Laravel Sanctum debe denegar el acceso con un código 401
-        $response->assertStatus(401);
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->category = Category::create(['name' => 'Hardware']);
     }
 
-    public function test_un_usuario_puede_hacer_login_y_recibir_un_token()
+    private function makeUser(string $role = 'usuario', string $email = 'usuario@test.com'): User
     {
-        User::create([
-            'name' => 'Usuario Test',
-            'email' => 'test@tif.com',
-            'password' => bcrypt('password123'),
-            'role' => 'usuario'
+        return User::create([
+            'name' => ucfirst($role) . ' Test',
+            'email' => $email,
+            'password' => 'password123',
+            'role' => $role,
         ]);
-
-        $response = $this->postJson('/api/login', [
-            'email' => 'test@tif.com',
-            'password' => 'password123'
-        ]);
-
-        $response->assertStatus(200)
-                 ->assertJsonStructure([
-                     'message',
-                     'access_token',
-                     'token_type',
-                     'user' => [
-                         'id',
-                         'name',
-                         'email',
-                         'role'
-                     ]
-                 ]);
     }
 
-    public function test_un_usuario_autenticado_puede_ver_las_incidencias()
+    private function makeIncident(User $creator, array $attributes = []): Incident
     {
-        $user = User::create([
-            'name' => 'Usuario Logueado',
-            'email' => 'auth@tif.com',
-            'password' => bcrypt('password123'),
-            'role' => 'usuario'
-        ]);
-
-        // Simulamos la petición con el token o usando actingAs con Sanctum
-        $response = $this->actingAs($user, 'sanctum')->getJson('/api/incidents');
-
-        // Esperamos un código 200 
-        $response->assertStatus(200);
+        return Incident::create(array_merge([
+            'title' => 'Equipo sin conexión',
+            'description' => 'La computadora del aula no tiene conexión.',
+            'status' => Incident::STATUS_OPEN,
+            'user_id' => $creator->id,
+            'category_id' => $this->category->id,
+        ], $attributes));
     }
 
-    public function test_un_usuario_puede_cerrar_sesion_correctamente()
+    public function test_un_visitante_no_puede_listar_incidencias(): void
     {
-        $user = User::create([
-            'name' => 'Usuario Logout',
-            'email' => 'logout@tif.com',
-            'password' => bcrypt('password123'),
-            'role' => 'usuario'
-        ]);
-
-        // 1. Creamos un token real de Sanctum
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        // 2. Enviamos la petición enviando el token Bearer en la cabecera
-        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
-                         ->postJson('/api/logout');
-
-        $response->assertStatus(200)
-                 ->assertJson([
-                     'message' => 'Sesión cerrada correctamente'
-                 ]);
+        $this->getJson('/api/incidencias')->assertUnauthorized();
     }
 
-    public function test_un_usuario_autenticado_puede_crear_una_incidencia()
+    public function test_login_devuelve_token_y_datos_basicos_del_usuario(): void
     {
-        $user = User::create([
-            'name' => 'Usuario Creador',
-            'email' => 'creador@tif.com',
-            'password' => bcrypt('password123'),
-            'role' => 'usuario'
-        ]);
+        $this->makeUser();
 
-        $response = $this->actingAs($user, 'sanctum')->postJson('/api/incidents', [
-            'title' => 'Falla en el proyector',
-            'description' => 'El proyector del aula 3 no enciende.',
-    
+        $this->postJson('/api/login', [
+            'email' => 'usuario@test.com',
+            'password' => 'password123',
+        ])->assertOk()->assertJsonStructure([
+            'access_token', 'token_type', 'user' => ['id', 'name', 'email', 'role'],
         ]);
-
-        // Dependiendo de si tu controlador devuelve 200 o 201 al crear
-        $response->assertStatus(200); 
     }
 
-    public function test_falla_al_intentar_crear_incidencia_sin_datos()
+    public function test_usuario_solo_ve_sus_propias_incidencias(): void
     {
-        $user = User::create([
-            'name' => 'Usuario Validador',
-            'email' => 'validador@tif.com',
-            'password' => bcrypt('password123'),
-            'role' => 'usuario'
-        ]);
+        $user = $this->makeUser();
+        $other = $this->makeUser('usuario', 'otro@test.com');
+        $ownIncident = $this->makeIncident($user);
+        $otherIncident = $this->makeIncident($other, ['title' => 'Incidencia ajena']);
 
-        $response = $this->actingAs($user, 'sanctum')->postJson('/api/incidents', []);
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/incidencias')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $ownIncident->id);
 
-        $response->assertStatus(422);
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/incidencias/' . $otherIncident->id)
+            ->assertNotFound();
     }
 
-    public function test_un_usuario_autenticado_puede_ver_las_categorias()
+    public function test_tecnico_puede_ver_todas_las_incidencias(): void
     {
-        $user = User::create([
-            'name' => 'Usuario Categorias',
-            'email' => 'cat@tif.com',
-            'password' => bcrypt('password123'),
-            'role' => 'usuario'
-        ]);
+        $user = $this->makeUser();
+        $other = $this->makeUser('usuario', 'otro@test.com');
+        $this->makeIncident($user);
+        $this->makeIncident($other, ['title' => 'Otro caso']);
+        $technician = $this->makeUser('tecnico', 'tecnico@test.com');
 
-        $response = $this->actingAs($user, 'sanctum')->getJson('/api/categories');
-
-        $response->assertStatus(200);
+        $this->actingAs($technician, 'sanctum')
+            ->getJson('/api/incidencias')
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
     }
 
-    public function test_el_login_falla_con_credenciales_incorrectas()
+    public function test_usuario_puede_crear_una_incidencia_que_nace_abierta(): void
     {
-        User::create([
-            'name' => 'Usuario Real',
-            'email' => 'real@tif.com',
-            'password' => bcrypt('claveCorrecta123'),
-            'role' => 'usuario'
-        ]);
+        $user = $this->makeUser();
 
-        $response = $this->postJson('/api/login', [
-            'email' => 'real@tif.com',
-            'password' => 'claveEquivocada'
-        ]);
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/incidencias', [
+                'title' => 'Falla del proyector',
+                'description' => 'El proyector del aula 3 no enciende.',
+                'category_id' => $this->category->id,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', Incident::STATUS_OPEN)
+            ->assertJsonPath('data.user_id', $user->id);
 
-        // ValidationException en AuthController devuelve 422
-        $response->assertStatus(422)
-                 ->assertJsonValidationErrors(['email']);
+        $this->assertDatabaseHas('incidents', ['title' => 'Falla del proyector']);
     }
 
-    public function test_un_usuario_autenticado_puede_consultar_su_perfil()
+    public function test_creacion_valida_campos_obligatorios_y_categoria(): void
     {
-        $user = User::create([
-            'name' => 'Elias Perfil',
-            'email' => 'perfil@tif.com',
-            'password' => bcrypt('password123'),
-            'role' => 'tecnico'
-        ]);
+        $user = $this->makeUser();
 
-        $response = $this->actingAs($user, 'sanctum')->getJson('/api/user');
-
-        $response->assertStatus(200)
-                 ->assertJson([
-                     'user' => [
-                         'name' => 'Elias Perfil',
-                         'email' => 'perfil@tif.com',
-                         'role' => 'tecnico',
-                     ]
-                 ]);
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/incidencias', [])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['title', 'description', 'category_id']);
     }
 
-    public function test_un_usuario_sin_autenticar_no_puede_ver_las_categorias()
+    public function test_tecnico_puede_tomar_una_incidencia_abierta(): void
     {
-        $response = $this->getJson('/api/categories');
+        $creator = $this->makeUser();
+        $technician = $this->makeUser('tecnico', 'tecnico@test.com');
+        $incident = $this->makeIncident($creator);
 
-        $response->assertStatus(401);
+        $this->actingAs($technician, 'sanctum')
+            ->putJson('/api/incidencias/' . $incident->id . '/tomar')
+            ->assertOk()
+            ->assertJsonPath('data.status', Incident::STATUS_IN_PROGRESS)
+            ->assertJsonPath('data.technician_id', $technician->id);
+    }
+
+    public function test_usuario_no_puede_tomar_una_incidencia(): void
+    {
+        $user = $this->makeUser();
+        $incident = $this->makeIncident($user);
+
+        $this->actingAs($user, 'sanctum')
+            ->putJson('/api/incidencias/' . $incident->id . '/tomar')
+            ->assertForbidden();
+    }
+
+    public function test_solo_el_tecnico_asignado_puede_resolver_y_debe_indicar_resolucion(): void
+    {
+        $creator = $this->makeUser();
+        $assigned = $this->makeUser('tecnico', 'asignado@test.com');
+        $otherTechnician = $this->makeUser('tecnico', 'otro-tecnico@test.com');
+        $incident = $this->makeIncident($creator, [
+            'status' => Incident::STATUS_IN_PROGRESS,
+            'technician_id' => $assigned->id,
+        ]);
+
+        $this->actingAs($otherTechnician, 'sanctum')
+            ->putJson('/api/incidencias/' . $incident->id . '/resolver', [
+                'resolution' => 'Se realizó una reparación de prueba.',
+            ])->assertForbidden();
+
+        $this->actingAs($assigned, 'sanctum')
+            ->putJson('/api/incidencias/' . $incident->id . '/resolver', [])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['resolution']);
+
+        $this->actingAs($assigned, 'sanctum')
+            ->putJson('/api/incidencias/' . $incident->id . '/resolver', [
+                'resolution' => 'Se reinstaló el controlador y se probó el equipo.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', Incident::STATUS_RESOLVED);
+    }
+
+    public function test_usuario_y_tecnico_pueden_comentar_y_se_listan_en_orden(): void
+    {
+        $creator = $this->makeUser();
+        $technician = $this->makeUser('tecnico', 'tecnico@test.com');
+        $incident = $this->makeIncident($creator);
+
+        $this->actingAs($creator, 'sanctum')
+            ->postJson('/api/incidencias/' . $incident->id . '/comentarios', [
+                'comment' => 'El problema comenzó hoy.',
+            ])->assertCreated();
+
+        $this->actingAs($technician, 'sanctum')
+            ->postJson('/api/incidencias/' . $incident->id . '/comentarios', [
+                'comment' => 'Vamos a revisar el equipo.',
+            ])->assertCreated();
+
+        $this->actingAs($creator, 'sanctum')
+            ->getJson('/api/incidencias/' . $incident->id . '/comentarios')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.comment', 'El problema comenzó hoy.')
+            ->assertJsonPath('data.1.comment', 'Vamos a revisar el equipo.');
+    }
+
+    public function test_categorias_precargadas_se_pueden_consultar(): void
+    {
+        $user = $this->makeUser();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/categories')
+            ->assertOk()
+            ->assertJsonPath('data.0.name', 'Hardware');
+    }
+
+    public function test_logout_revoca_el_token_actual(): void
+    {
+        $user = $this->makeUser();
+        $plainToken = $user->createToken('test-token')->plainTextToken;
+
+        $this->withHeader('Authorization', 'Bearer ' . $plainToken)
+            ->postJson('/api/logout')
+            ->assertOk();
+
+        $this->withHeader('Authorization', 'Bearer ' . $plainToken)
+            ->getJson('/api/user')
+            ->assertUnauthorized();
     }
 }
