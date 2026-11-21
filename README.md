@@ -1,5 +1,3 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
-
 <p align="center">
 <a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
@@ -7,53 +5,125 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
-## About Laravel
+# Backend — Sistema de Gestión de Incidencias Técnicas
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Una institución educativa necesita registrar y realizar el seguimiento de los problemas técnicos informados por sus usuarios. Actualmente estos problemas se comunican verbalmente, por correo electrónico o mediante mensajería, lo que dificulta conocer cuáles continúan pendientes, quién los informó, qué técnico se encuentra trabajando sobre cada caso y cuáles ya fueron solucionados.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Requisitos
 
-## Learning Laravel
+- PHP 8.2 o superior.
+- Composer 2.
+- MySQL o MariaDB (por ejemplo, el servicio MySQL de XAMPP).
+- Extensiones PHP: `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `fileinfo` y `curl`.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## Instalación en Windows
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+1. Iniciar MySQL desde XAMPP y crear una base de datos vacía llamada `tif_incidencias` con cotejamiento `utf8mb4_unicode_ci`.
+2. Abrir CMD o la terminal de VS Code dentro de la carpeta `tif-incidencias-backend`.
+3. Instalar dependencias:
 
-## Laravel Sponsors
+   ```bash
+   composer install
+   ```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+4. Crear el archivo de entorno:
 
-### Premium Partners
+   ```bat
+   copy .env.example .env
+   ```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+5. Editar `.env` y comprobar `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` y `DB_PASSWORD` según la instalación local de MySQL.
+6. Generar la clave y crear las tablas/datos de prueba:
 
-## Contributing
+   ```bash
+   C:\php84\php.exe artisan key:generate
+   C:\php84\php.exe artisan migrate --seed
+   ```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+   Para reconstruir desde cero una base de desarrollo, usar `C:\php84\php.exe artisan migrate:fresh --seed`. **Este comando borra los datos existentes.**
 
-## Code of Conduct
+7. Levantar la API:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+   ```bash
+   C:\php84\php.exe artisan serve --host=127.0.0.1 --port=8000
+   ```
 
-## Security Vulnerabilities
+La API queda disponible en `http://127.0.0.1:8000/api`.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Usuarios de prueba
 
-## License
+| Rol | Correo | Contraseña |
+|---|---|---|
+| Usuario | `usuario@tif.com` | `password123` |
+| Técnico | `tecnico@tif.com` | `password123` |
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Cambiar estas contraseñas si se publica el sistema fuera del entorno local.
+
+## Endpoints principales
+
+Todas las rutas, salvo `POST /login`, requieren el encabezado `Authorization: Bearer TOKEN`.
+
+| Método | Endpoint | Función |
+|---|---|---|
+| POST | `/api/login` | Autenticar y recibir token Sanctum |
+| POST | `/api/logout` | Revocar el token actual |
+| GET | `/api/user` | Consultar usuario autenticado |
+| GET | `/api/categories` | Listar categorías precargadas |
+| GET | `/api/incidencias` | Listar según rol; filtros `status` y `category_id` |
+| POST | `/api/incidencias` | Crear incidencia (rol usuario) |
+| GET | `/api/incidencias/{id}` | Ver detalle y comentarios |
+| PUT | `/api/incidencias/{id}/tomar` | Tomar incidencia (técnico) |
+| PUT | `/api/incidencias/{id}/resolver` | Resolver (técnico asignado) |
+| GET | `/api/incidencias/{id}/comentarios` | Listar comentarios cronológicamente |
+| POST | `/api/incidencias/{id}/comentarios` | Agregar comentario |
+
+El backend también conserva alias en inglés `/api/incidents` y `/comments` para compatibilidad con el proyecto inicial.
+
+### Ejemplos de JSON
+
+Crear incidencia:
+
+```json
+{
+  "title": "La impresora no responde",
+  "description": "La impresora de secretaría no imprime los documentos.",
+  "category_id": 4
+}
+```
+
+Agregar comentario:
+
+```json
+{
+  "comment": "Revisé la conexión y continúa sin responder."
+}
+```
+
+Resolver incidencia:
+
+```json
+{
+  "resolution": "Se reinstaló el controlador y se verificó una impresión de prueba."
+}
+```
+
+## Reglas aplicadas en el servidor
+
+- Un usuario solo consulta sus propias incidencias; el técnico consulta todas.
+- Las incidencias nuevas se crean con estado `ABIERTA`.
+- Solo un técnico puede tomar una incidencia `ABIERTA`; al tomarla pasa a `EN PROCESO` y queda asignada.
+- Solo el técnico asignado puede resolver una incidencia `EN PROCESO`.
+- Para pasar a `RESUELTA` es obligatoria una descripción de resolución.
+- Los permisos no dependen de ocultar botones en el frontend: se verifican en Laravel.
+- Los comentarios quedan asociados a su autor y se devuelven en orden cronológico.
+
+## Integración con frontend
+
+El frontend se configura en `tif-incidencias-frontend/assets/js/config.js`. El valor inicial apunta a `http://127.0.0.1:8000/api`. La configuración CORS permite las solicitudes HTTP locales entre los dos proyectos. Antes de publicar el backend, reemplazar el origen abierto de `config/cors.php` por el dominio real del frontend.
+
+## Pruebas
+
+```bash
+C:\php84\php.exe artisan test
+```
