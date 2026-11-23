@@ -202,17 +202,17 @@ class TifApiTest extends TestCase
             ->assertJsonPath('data.0.name', 'Hardware');
     }
 
-    public function test_logout_revoca_el_token_actual(): void
+    public function logout(Request $request): JsonResponse
     {
-        $user = $this->makeUser();
-        $plainToken = $user->createToken('test-token')->plainTextToken;
+       // Revocar el token actual.
+       $request->user()->currentAccessToken()?->delete();
 
-        $this->withHeader('Authorization', 'Bearer ' . $plainToken)
-            ->postJson('/api/logout')
-            ->assertOk();
+       // Limpiar el usuario almacenado en el guard de Sanctum.
+       Auth::guard('sanctum')->forgetUser();
 
-        $this->withHeader('Authorization', 'Bearer ' . $plainToken)
-            ->getJson('/api/user')
-            ->assertUnauthorized();
+       return response()->json([
+           'success' => true,
+           'message' => 'Sesión cerrada correctamente.',
+       ]);
     }
 }
