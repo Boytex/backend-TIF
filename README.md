@@ -12,21 +12,25 @@ Una institución educativa necesita registrar y realizar el seguimiento de los p
 
 ## Requisitos
 
-- PHP 8.2 o superior.
+- PHP 8.4 o superior.
 - Composer 2.
 - MySQL o MariaDB (por ejemplo, el servicio MySQL de XAMPP).
 - Extensiones PHP: `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `fileinfo` y `curl`.
 
+
+
 ## Instalación en Windows
 
 1. Iniciar MySQL desde XAMPP y crear una base de datos vacía llamada `tif_incidencias` con cotejamiento `utf8mb4_unicode_ci`.
+
 2. Abrir CMD o la terminal de VS Code dentro de la carpeta `tif-incidencias-backend`.
+
 3. Instalar dependencias:
 
    ```bash
    composer install
    ```
-
+  
 4. Crear el archivo de entorno:
 
    ```bat
@@ -34,6 +38,8 @@ Una institución educativa necesita registrar y realizar el seguimiento de los p
    ```
 
 5. Editar `.env` y comprobar `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` y `DB_PASSWORD` según la instalación local de MySQL.
+
+
 6. Generar la clave y crear las tablas/datos de prueba:
 
    ```bash
@@ -59,6 +65,9 @@ La API queda disponible en `http://127.0.0.1:8000/api`.
 | Técnico | `tecnico@tif.com` | `password123` |
 
 Cambiar estas contraseñas si se publica el sistema fuera del entorno local.
+
+
+
 
 ## Endpoints principales
 
@@ -127,3 +136,36 @@ El frontend se configura en `tif-incidencias-frontend/assets/js/config.js`. El v
 ```bash
 C:\php84\php.exe artisan test
 ```
+
+
+
+Solución de problemas
+Error al ejecutar composer install en Windows
+
+Si al ejecutar composer install aparece el siguiente error:
+
+
+In PackageManifest.php line 179:
+
+The bootstrap/cache directory must be present and writable.
+
+
+Y la carpeta bootstrap/cache existe, pero Laravel indica que no tiene permisos de escritura, es posible que Windows tenga activado el atributo ReadOnly (solo lectura) en dicha carpeta.
+
+Solución:
+
+Desde PowerShell, ubicarse en la raíz del proyecto Laravel y ejecutar:
+
+powershell
+attrib -R .\bootstrap\cache
+attrib -R .\bootstrap\cache\* /S /D
+
+
+Estos comandos eliminan el atributo de solo lectura de la carpeta bootstrap/cache y de su contenido.
+
+Luego, volver a ejecutar:
+
+composer install
+
+
+Nota: Esta solución corresponde al problema del atributo ReadOnly en Windows. No es necesario modificar los permisos generales del proyecto ni reinstalar Composer.
