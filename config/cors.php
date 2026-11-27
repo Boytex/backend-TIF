@@ -3,7 +3,9 @@
 return [
     'paths' => ['api/*', 'sanctum/csrf-cookie'],
     'allowed_methods' => ['*'],
-    'allowed_origins' => ['http://127.0.0.1:5500',
+    'allowed_origins' => [
+        'http://127.0.0.1:5500',
+        'https://josev23v20.github.io'
     ],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
